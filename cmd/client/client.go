@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/gob"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -11,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/jimzhong/wireguard-overlay/internal/config"
 	"github.com/jimzhong/wireguard-overlay/internal/wg"
 	"github.com/sirupsen/logrus"
@@ -42,9 +42,10 @@ func fetchPeers(server net.TCPAddr) ([]wg.Peer, error) {
 	return peers, nil
 }
 
-func updatePeers(wg *wg.State, serverAddr net.TCPAddr, preshardKey wgtypes.Key, timer chan<- *time.Timer) {
+func updatePeers(wg *wg.State, serverAddr net.TCPAddr, preshardKey wgtypes.Key, bf backoff.BackOff, timer chan<- time.Duration) {
 	peers, err := fetchPeers(serverAddr)
 	if err == nil {
+		bf.Reset()
 		for i := range peers {
 			peers[i].PresharedKey = preshardKey
 		}
@@ -54,7 +55,7 @@ func updatePeers(wg *wg.State, serverAddr net.TCPAddr, preshardKey wgtypes.Key, 
 		}
 		logrus.Debug("Added peers: ", peers)
 	}
-	timer <- time.NewTimer(time.Second * time.Duration(rand.Int()%20+20))
+	timer <- bf.NextBackOff()
 }
 
 func main() {
@@ -111,7 +112,18 @@ func main() {
 	incomingSignals := make(chan os.Signal, 1)
 	signal.Notify(incomingSignals, syscall.SIGTERM, os.Interrupt)
 	timer := time.NewTimer(0)
-	resp := make(chan *time.Timer)
+	resp := make(chan time.Duration)
+	bf := &backoff.ExponentialBackOff{
+		InitialInterval:     10 * time.Second,
+		MaxInterval:         60 * time.Second,
+		MaxElapsedTime:      0,
+		RandomizationFactor: backoff.DefaultRandomizationFactor,
+		Multiplier:          backoff.DefaultMultiplier,
+		Stop:                backoff.Stop,
+		Clock:               backoff.SystemClock,
+	}
+	bf.Reset()
+	httpServerAddr := net.TCPAddr{IP: wgState.GetOverlayAddress(serverPubkey).IP, Port: config.ServerPort}
 
 main_loop:
 	for {
@@ -119,9 +131,10 @@ main_loop:
 		case <-incomingSignals:
 			break main_loop
 		case <-timer.C:
-			go updatePeers(wgState, net.TCPAddr{IP: wgState.GetOverlayAddress(serverPubkey).IP, Port: config.ServerPort}, presharedKey, resp)
-		case timer = <-resp:
-			logrus.Debug("Got new timer")
+			go updatePeers(wgState, httpServerAddr, presharedKey, bf, resp)
+		case wait := <-resp:
+			logrus.Debug("Next fetch in ", wait)
+			timer = time.NewTimer(wait)
 		}
 	}
 }
