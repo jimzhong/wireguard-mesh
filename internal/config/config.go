@@ -41,7 +41,7 @@ func LoadServerConfig() (*server_config, error) {
 	err := gonfig.Load(&config, gonfig.Conf{
 		ConfigFileVariable:  "config",
 		FileDecoder:         gonfig.DecoderJSON,
-		FileDefaultFilename: "/etc/wireguard-mesh/server.json",
+		FileDefaultFilename: "/etc/wireguard-overlay/server.json",
 		EnvDisable:          true})
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func LoadClientConfig() (*client_config, error) {
 	err := gonfig.Load(&config, gonfig.Conf{
 		ConfigFileVariable:  "config",
 		FileDecoder:         gonfig.DecoderJSON,
-		FileDefaultFilename: "/etc/wireguard-mesh/client.json",
+		FileDefaultFilename: "/etc/wireguard-overlay/client.json",
 		EnvDisable:          true})
 	if err != nil {
 		return nil, err
