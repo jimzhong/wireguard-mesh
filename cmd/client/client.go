@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -48,6 +49,11 @@ func updatePeers(wg *wg.State, serverAddr net.TCPAddr, preshardKey wgtypes.Key, 
 		bf.Reset()
 		for i := range peers {
 			peers[i].PresharedKey = preshardKey
+			if strings.Count(peers[i].IP, ".") == 4 {
+				// If the peer is on IPv4
+				// TODO: make this confirgurable?
+				peers[i].KeepaliveInterval = 20 * time.Second
+			}
 		}
 		err = wg.AddPeers(peers)
 		if err != nil {
@@ -84,7 +90,7 @@ func main() {
 		return wgtypes.Key{}
 	}()
 
-	wgState, err := wg.New(config.Interface, 0, (*net.IPNet)(config.OverlayNet), config.PrivateKey)
+	wgState, err := wg.New(config.Interface, 0, (net.IPNet)(*config.OverlayNet), config.PrivateKey)
 	if err != nil {
 		logrus.WithError(err).Fatal("Could not instantiate wireguard controller")
 	}

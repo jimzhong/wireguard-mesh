@@ -16,7 +16,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-func startHttpServer(wg *wg.State, port int) *http.Server {
+func startHttpServer(wgState *wg.State, port int) *http.Server {
 	mux := http.NewServeMux()
 	c := cache.New(5*time.Second, time.Minute)
 	mux.HandleFunc("/",
@@ -24,7 +24,13 @@ func startHttpServer(wg *wg.State, port int) *http.Server {
 			peers, found := c.Get("")
 			logrus.Debug("Cache found: ", found)
 			if !found {
-				peers, _ = wg.GetPeers()
+				ps, _ := wgState.GetPeers()
+				for i := range ps {
+					// Clients should not see these fields
+					ps[i].KeepaliveInterval = 0
+					ps[i].PresharedKey = wgtypes.Key{}
+				}
+				peers = ps
 				c.Set("", peers, cache.DefaultExpiration)
 			}
 			logrus.Debug("Peers: ", peers)
@@ -38,7 +44,7 @@ func startHttpServer(wg *wg.State, port int) *http.Server {
 			}
 		})
 	addr := net.TCPAddr{
-		IP:   wg.OverlayAddr.IP,
+		IP:   wgState.OverlayAddr.IP,
 		Port: port,
 	}
 	server := &http.Server{
@@ -67,7 +73,7 @@ func main() {
 	}
 	logrus.SetLevel(logLevel)
 
-	wgState, err := wg.New(config.Interface, config.Port, (*net.IPNet)(config.OverlayNet), config.PrivateKey)
+	wgState, err := wg.New(config.Interface, config.Port, (net.IPNet)(*config.OverlayNet), config.PrivateKey)
 	if err != nil {
 		logrus.WithError(err).Fatal("Could not instantiate wireguard controller")
 	}

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"net"
 	"os"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
@@ -23,14 +24,32 @@ type State struct {
 }
 
 type Peer struct {
-	IP           string
-	Port         int
-	PublicKey    wgtypes.Key
-	PresharedKey wgtypes.Key
+	IP                string
+	Port              int
+	PublicKey         wgtypes.Key
+	PresharedKey      wgtypes.Key
+	KeepaliveInterval time.Duration
+}
+
+func (p *Peer) toPeerConfig(overlayNet net.IPNet) wgtypes.PeerConfig {
+	config := wgtypes.PeerConfig{
+		PublicKey: p.PublicKey,
+		AllowedIPs: []net.IPNet{
+			getOverlayAddr(overlayNet, p.PublicKey),
+		},
+		PresharedKey: &p.PresharedKey,
+	}
+	if p.Port != 0 && p.IP != "" {
+		config.Endpoint = &net.UDPAddr{IP: net.ParseIP(p.IP), Port: p.Port}
+	}
+	if p.KeepaliveInterval != 0 {
+		config.PersistentKeepaliveInterval = &p.KeepaliveInterval
+	}
+	return config
 }
 
 // GetOverlayAddr synthesizes an address by hashing the pubkey
-func getOverlayAddr(ipnet *net.IPNet, pubkey wgtypes.Key) net.IPNet {
+func getOverlayAddr(ipnet net.IPNet, pubkey wgtypes.Key) net.IPNet {
 	// TODO: handle all zero and all one host addresses.
 	bits, size := ipnet.Mask.Size()
 	ip := make([]byte, len(ipnet.IP))
@@ -48,13 +67,13 @@ func getOverlayAddr(ipnet *net.IPNet, pubkey wgtypes.Key) net.IPNet {
 // New creates a new Wesher Wireguard state
 // The Wireguard keys are generated for every new interface
 // The interface must later be setup using SetUpInterface
-func New(iface string, port int, ipnet *net.IPNet, privkey string) (*State, error) {
+func New(iface string, port int, overlayNet net.IPNet, privKey string) (*State, error) {
 	client, err := wgctrl.New()
 	if err != nil {
 		return nil, errors.Wrap(err, "Could not instantiate wireguard client")
 	}
 
-	privateKey, err := wgtypes.ParseKey(privkey)
+	privateKey, err := wgtypes.ParseKey(privKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "Could not parse private key")
 	}
@@ -64,15 +83,15 @@ func New(iface string, port int, ipnet *net.IPNet, privkey string) (*State, erro
 		client:         client,
 		privateKey:     privateKey,
 		PublicKey:      pubKey,
-		OverlayNetwork: *ipnet,
-		OverlayAddr:    getOverlayAddr(ipnet, pubKey),
+		OverlayNetwork: overlayNet,
+		OverlayAddr:    getOverlayAddr(overlayNet, pubKey),
 		port:           port,
 	}
 	return &state, nil
 }
 
 func (s *State) GetOverlayAddress(pubkey wgtypes.Key) net.IPNet {
-	return getOverlayAddr(&s.OverlayNetwork, pubkey)
+	return getOverlayAddr(s.OverlayNetwork, pubkey)
 }
 
 // DownInterface shuts down the associated network interface
@@ -137,20 +156,7 @@ func (s *State) AddPeers(peers []Peer) error {
 	config := make([]wgtypes.PeerConfig, 0, len(peers))
 	for _, p := range peers {
 		if p.PublicKey != s.PublicKey {
-			endpoint := func() *net.UDPAddr {
-				if p.Port == 0 {
-					return nil
-				}
-				return &net.UDPAddr{IP: net.ParseIP(p.IP), Port: p.Port}
-			}()
-			config = append(config, wgtypes.PeerConfig{
-				Endpoint:  endpoint,
-				PublicKey: p.PublicKey,
-				AllowedIPs: []net.IPNet{
-					getOverlayAddr(&s.OverlayNetwork, p.PublicKey),
-				},
-				PresharedKey: &p.PresharedKey,
-			})
+			config = append(config, p.toPeerConfig(s.OverlayNetwork))
 		}
 	}
 	if err := s.client.ConfigureDevice(s.iface, wgtypes.Config{
@@ -161,6 +167,19 @@ func (s *State) AddPeers(peers []Peer) error {
 	return nil
 }
 
+func fromWgtypesPeer(p *wgtypes.Peer) Peer {
+	peer := Peer{
+		PublicKey:         p.PublicKey,
+		PresharedKey:      p.PresharedKey,
+		KeepaliveInterval: p.PersistentKeepaliveInterval,
+	}
+	if p.Endpoint != nil {
+		peer.IP = p.Endpoint.IP.String()
+		peer.Port = p.Endpoint.Port
+	}
+	return peer
+}
+
 func (s *State) GetPeers() ([]Peer, error) {
 	device, err := s.client.Device(s.iface)
 	if err != nil {
@@ -168,22 +187,7 @@ func (s *State) GetPeers() ([]Peer, error) {
 	}
 	peers := make([]Peer, 0, len(device.Peers))
 	for _, p := range device.Peers {
-		peers = append(peers, Peer{
-			IP: func() string {
-				if p.Endpoint == nil {
-					return ""
-				}
-				return p.Endpoint.IP.String()
-			}(),
-			Port: func() int {
-				if p.Endpoint == nil {
-					return 0
-				}
-				return p.Endpoint.Port
-			}(),
-			PublicKey:    p.PublicKey,
-			PresharedKey: p.PresharedKey,
-		})
+		peers = append(peers, fromWgtypesPeer(&p))
 	}
 	return peers, nil
 }
