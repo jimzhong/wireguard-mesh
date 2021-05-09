@@ -44,7 +44,8 @@ func startHttpServer(wg *wg.State, port int) *http.Server {
 	server := &http.Server{
 		Addr:         addr.String(),
 		ReadTimeout:  3 * time.Second,
-		WriteTimeout: 5 * time.Second,
+		WriteTimeout: 6 * time.Second,
+		IdleTimeout:  120 * time.Second,
 		Handler:      mux,
 	}
 	go func() {
