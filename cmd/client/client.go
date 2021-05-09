@@ -49,7 +49,7 @@ func updatePeers(wg *wg.State, serverAddr net.TCPAddr, preshardKey wgtypes.Key, 
 		bf.Reset()
 		for i := range peers {
 			peers[i].PresharedKey = preshardKey
-			if strings.Count(peers[i].IP, ".") == 4 {
+			if strings.Count(peers[i].IP, ".") == 3 {
 				// If the peer is on IPv4
 				// TODO: make this confirgurable?
 				peers[i].KeepaliveInterval = 20 * time.Second
