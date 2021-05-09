@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jimzhong/wireguard-mesh/internal/config"
-	"github.com/jimzhong/wireguard-mesh/internal/wg"
+	"github.com/jimzhong/wireguard-overlay/internal/config"
+	"github.com/jimzhong/wireguard-overlay/internal/wg"
 	"github.com/patrickmn/go-cache"
 	"github.com/sirupsen/logrus"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"

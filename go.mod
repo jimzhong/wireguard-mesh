@@ -1,4 +1,4 @@
-module github.com/jimzhong/wireguard-mesh
+module github.com/jimzhong/wireguard-overlay
 
 go 1.16
 
