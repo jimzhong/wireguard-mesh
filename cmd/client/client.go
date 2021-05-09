@@ -42,7 +42,7 @@ func fetchPeers(server net.TCPAddr) ([]wg.Peer, error) {
 	return peers, nil
 }
 
-func updatePeers(wg *wg.State, serverAddr net.TCPAddr, preshardKey wgtypes.Key, bf backoff.BackOff, timer chan<- time.Duration) {
+func updatePeers(wg *wg.State, serverAddr net.TCPAddr, preshardKey wgtypes.Key, bf backoff.BackOff, delay chan<- time.Duration) {
 	peers, err := fetchPeers(serverAddr)
 	if err == nil {
 		bf.Reset()
@@ -55,7 +55,7 @@ func updatePeers(wg *wg.State, serverAddr net.TCPAddr, preshardKey wgtypes.Key, 
 		}
 		logrus.Debug("Added peers: ", peers)
 	}
-	timer <- bf.NextBackOff()
+	delay <- bf.NextBackOff()
 }
 
 func main() {
@@ -111,7 +111,7 @@ func main() {
 	logrus.Infof("Client is running. Pubkey: %s IP: %s", wgState.PublicKey, &wgState.OverlayAddr)
 	incomingSignals := make(chan os.Signal, 1)
 	signal.Notify(incomingSignals, syscall.SIGTERM, os.Interrupt)
-	resp := make(chan time.Duration)
+	delayCh := make(chan time.Duration)
 	bf := &backoff.ExponentialBackOff{
 		InitialInterval:     10 * time.Second,
 		MaxInterval:         60 * time.Second,
@@ -130,10 +130,10 @@ main_loop:
 		case <-incomingSignals:
 			break main_loop
 		case <-timer.C:
-			go updatePeers(wgState, httpServerAddr, presharedKey, bf, resp)
-		case wait := <-resp:
-			logrus.Debug("Next fetch in ", wait)
-			timer = time.NewTimer(wait)
+			go updatePeers(wgState, httpServerAddr, presharedKey, bf, delayCh)
+		case delay := <-delayCh:
+			logrus.Debug("Next fetch in ", delay)
+			timer = time.NewTimer(delay)
 		}
 	}
 }
