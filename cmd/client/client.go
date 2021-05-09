@@ -111,7 +111,6 @@ func main() {
 	logrus.Infof("Client is running. Pubkey: %s IP: %s", wgState.PublicKey, &wgState.OverlayAddr)
 	incomingSignals := make(chan os.Signal, 1)
 	signal.Notify(incomingSignals, syscall.SIGTERM, os.Interrupt)
-	timer := time.NewTimer(0)
 	resp := make(chan time.Duration)
 	bf := &backoff.ExponentialBackOff{
 		InitialInterval:     10 * time.Second,
@@ -124,7 +123,7 @@ func main() {
 	}
 	bf.Reset()
 	httpServerAddr := net.TCPAddr{IP: wgState.GetOverlayAddress(serverPubkey).IP, Port: config.ServerPort}
-
+	timer := time.NewTimer(0)
 main_loop:
 	for {
 		select {
