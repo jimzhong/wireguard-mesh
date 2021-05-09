@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/gob"
-	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -38,8 +37,12 @@ func startHttpServer(wg *wg.State, port int) *http.Server {
 				logrus.WithError(err).Error("Could not encode peers")
 			}
 		})
+	addr := net.TCPAddr{
+		IP:   wg.OverlayAddr.IP,
+		Port: port,
+	}
 	server := &http.Server{
-		Addr:         fmt.Sprintf(":%d", port),
+		Addr:         addr.String(),
 		ReadTimeout:  3 * time.Second,
 		WriteTimeout: 5 * time.Second,
 		Handler:      mux,
