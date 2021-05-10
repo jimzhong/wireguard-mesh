@@ -139,7 +139,7 @@ main_loop:
 			go updatePeers(wgState, httpServerAddr, presharedKey, bf, delayCh)
 		case delay := <-delayCh:
 			logrus.Debug("Next fetch in ", delay)
-			timer = time.NewTimer(delay)
+			timer.Reset(delay)
 		}
 	}
 }
