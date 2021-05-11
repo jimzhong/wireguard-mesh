@@ -43,7 +43,7 @@ func fetchPeers(server net.TCPAddr) ([]wg.Peer, error) {
 	return peers, nil
 }
 
-func updatePeers(wg *wg.State, serverAddr net.TCPAddr, preshardKey wgtypes.Key, bf backoff.BackOff, delay chan<- time.Duration) {
+func refreshPeers(wg *wg.State, serverAddr net.TCPAddr, preshardKey wgtypes.Key, bf backoff.BackOff, delay chan<- time.Duration) {
 	peers, err := fetchPeers(serverAddr)
 	if err == nil {
 		bf.Reset()
@@ -130,13 +130,13 @@ func main() {
 	bf.Reset()
 	httpServerAddr := net.TCPAddr{IP: wgState.GetOverlayAddress(serverPubkey).IP, Port: config.ServerPort}
 	timer := time.NewTimer(0)
-main_loop:
+mainLoop:
 	for {
 		select {
 		case <-incomingSignals:
-			break main_loop
+			break mainLoop
 		case <-timer.C:
-			go updatePeers(wgState, httpServerAddr, presharedKey, bf, delayCh)
+			go refreshPeers(wgState, httpServerAddr, presharedKey, bf, delayCh)
 		case delay := <-delayCh:
 			logrus.Debug("Next fetch in ", delay)
 			timer.Reset(delay)
