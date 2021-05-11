@@ -16,7 +16,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-func startHttpServer(wgState *wg.State, port int) *http.Server {
+func newHttpServer(wgState *wg.State, port int) *http.Server {
 	mux := http.NewServeMux()
 	c := cache.New(5*time.Second, time.Minute)
 	mux.HandleFunc("/",
@@ -31,7 +31,7 @@ func startHttpServer(wgState *wg.State, port int) *http.Server {
 					ps[i].PresharedKey = wgtypes.Key{}
 				}
 				peers = ps
-				c.Set("", peers, cache.DefaultExpiration)
+				c.SetDefault("", peers)
 			}
 			logrus.Debug("Peers: ", peers)
 			if peers == nil {
@@ -54,11 +54,6 @@ func startHttpServer(wgState *wg.State, port int) *http.Server {
 		IdleTimeout:  120 * time.Second,
 		Handler:      mux,
 	}
-	go func() {
-		if err := server.ListenAndServe(); err != nil {
-			logrus.WithError(err).Fatal("Could not start server")
-		}
-	}()
 	return server
 }
 
@@ -100,7 +95,14 @@ func main() {
 	if err = wgState.AddPeers(peers); err != nil {
 		logrus.WithError(err).Error("Could not add peers")
 	}
-	startHttpServer(wgState, config.Port)
+
+	server := newHttpServer(wgState, config.Port)
+	defer server.Close()
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logrus.WithError(err).Fatal("Could not start server")
+		}
+	}()
 	logrus.Info("Server is running. Pubkey: ", wgState.PublicKey)
 
 	incomingSigs := make(chan os.Signal, 1)
