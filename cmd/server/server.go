@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/gob"
+	"errors"
 	"net"
 	"net/http"
 	"os"
@@ -99,7 +100,7 @@ func main() {
 	server := newHttpServer(wgState, config.Port)
 	defer server.Close()
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
 			logrus.WithError(err).Fatal("Could not start server")
 		}
 	}()
