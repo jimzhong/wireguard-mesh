@@ -119,7 +119,7 @@ func main() {
 	signal.Notify(incomingSignals, syscall.SIGTERM, os.Interrupt)
 	delayCh := make(chan time.Duration)
 	bf := &backoff.ExponentialBackOff{
-		InitialInterval:     10 * time.Second,
+		InitialInterval:     time.Duration(config.PeerRefreshIntervalSecs) * time.Second,
 		MaxInterval:         60 * time.Second,
 		MaxElapsedTime:      0,
 		RandomizationFactor: backoff.DefaultRandomizationFactor,

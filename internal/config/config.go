@@ -15,15 +15,16 @@ import (
 // }
 
 type client_config struct {
-	ConfigFile   string   `id:"config" desc:"config file"`
-	OverlayNet   *network `id:"overlay-net" desc:"the network in which to allocate addresses for the overlay network (CIDR format)" default:"fd80:dead:beef:1234::/64"`
-	Interface    string   `desc:"name of the wireguard interface to create and manage" default:"wgoverlay"`
-	LogLevel     string   `id:"log-level" desc:"set the verbosity (debug/info/warn/error)" default:"info"`
-	PrivateKey   string   `id:"private-key" desc:"private key for wireguard; must be 32 bytes base64 encoded;"`
-	ServerAddr   *net.IP  `id:"server-addr" desc:"IP address of the server"`
-	ServerPort   int      `id:"port" desc:"server's wireguard port (UDP) and peer query port (TCP)" default:"54321"`
-	ServerPubkey string   `id:"server-pubkey" desc:"base64 encoded public key of the server"`
-	PresharedKey string   `id:"preshared-key" desc:"base64 encoded symmetric encryption for data communication between clients"`
+	ConfigFile              string   `id:"config" desc:"config file"`
+	OverlayNet              *network `id:"overlay-net" desc:"the network in which to allocate addresses for the overlay network (CIDR format)" default:"fd80:dead:beef:1234::/64"`
+	Interface               string   `desc:"name of the wireguard interface to create and manage" default:"wgoverlay"`
+	LogLevel                string   `id:"log-level" desc:"set the verbosity (debug/info/warn/error)" default:"info"`
+	PrivateKey              string   `id:"private-key" desc:"private key for wireguard; must be 32 bytes base64 encoded;"`
+	ServerAddr              *net.IP  `id:"server-addr" desc:"IP address of the server"`
+	ServerPort              int      `id:"port" desc:"server's wireguard port (UDP) and peer query port (TCP)" default:"54321"`
+	ServerPubkey            string   `id:"server-pubkey" desc:"base64 encoded public key of the server"`
+	PresharedKey            string   `id:"preshared-key" desc:"base64 encoded symmetric encryption for data communication between clients"`
+	PeerRefreshIntervalSecs int      `id:"peer-refresh-interval" desc:"interval between peer refreshes in seconds" default:"20"`
 }
 
 type server_config struct {
