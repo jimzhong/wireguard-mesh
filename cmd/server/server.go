@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/gob"
 	"errors"
 	"net"
@@ -22,26 +23,37 @@ func newHttpServer(wgState *wg.State, port int) *http.Server {
 	c := cache.New(5*time.Second, time.Minute)
 	mux.HandleFunc("/",
 		func(w http.ResponseWriter, request *http.Request) {
-			peers, found := c.Get("")
-			logrus.Debug("Cache found: ", found)
-			if !found {
-				ps, _ := wgState.GetPeers()
-				for i := range ps {
-					// Clients should not see these fields
-					ps[i].KeepaliveInterval = 0
-					ps[i].PresharedKey = wgtypes.Key{}
+			cached, found := c.Get("")
+			logrus.Debug("Cache hit: ", found)
+			var serialized []byte
+			if found {
+				var ok bool
+				serialized, ok = cached.([]byte)
+				if !ok {
+					http.Error(w, "Could not read serialized peers", http.StatusInternalServerError)
 				}
-				peers = ps
-				c.SetDefault("", peers)
+			} else {
+				peers, _ := wgState.GetPeers()
+				for i := range peers {
+					// Clients should not see these fields
+					peers[i].KeepaliveInterval = 0
+					peers[i].PresharedKey = wgtypes.Key{}
+				}
+				var buf bytes.Buffer
+				if err := gob.NewEncoder(&buf).Encode(peers); err != nil {
+					http.Error(w, "Could not serialize peers", http.StatusInternalServerError)
+					return
+				}
+				serialized = buf.Bytes()
+				c.SetDefault("", serialized)
 			}
-			logrus.Debug("Peers: ", peers)
-			if peers == nil {
-				logrus.Error("Could not get wireguard peers")
+			if serialized == nil {
+				http.Error(w, "Could not get serialized peers", http.StatusInternalServerError)
 				return
 			}
-			err := gob.NewEncoder(w).Encode(peers)
+			_, err := w.Write(serialized)
 			if err != nil {
-				logrus.WithError(err).Error("Could not encode peers")
+				logrus.WithError(err).Error("Could not write response")
 			}
 		})
 	addr := net.TCPAddr{
