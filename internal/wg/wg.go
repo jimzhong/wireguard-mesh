@@ -137,7 +137,7 @@ func (s *State) SetUpInterface() error {
 		return errors.Wrapf(err, "Could not set address for %s", s.iface)
 	}
 	// TODO: make MTU configurable?
-	if err := netlink.LinkSetMTU(link, 1420); err != nil {
+	if err := netlink.LinkSetMTU(link, 1280); err != nil {
 		return errors.Wrapf(err, "Could not set MTU for %s", s.iface)
 	}
 	if err := netlink.LinkSetUp(link); err != nil {
